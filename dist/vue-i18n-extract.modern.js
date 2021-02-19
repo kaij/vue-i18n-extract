@@ -1,8 +1,8 @@
 import path from 'path';
+import Dot from 'dot-object';
 import isValidGlob from 'is-valid-glob';
 import glob from 'glob';
 import fs from 'fs';
-import dot from 'dot-object';
 import yaml from 'js-yaml';
 
 function _extends() {
@@ -149,7 +149,7 @@ function readLangFiles(src) {
   });
 }
 
-function extractI18nItemsFromLanguageFiles(languageFiles) {
+function extractI18nItemsFromLanguageFiles(languageFiles, dot = Dot) {
   return languageFiles.reduce((accumulator, file) => {
     const language = file.fileName.substring(file.fileName.lastIndexOf('/') + 1, file.fileName.lastIndexOf('.'));
 
@@ -159,7 +159,9 @@ function extractI18nItemsFromLanguageFiles(languageFiles) {
 
     const flattenedObject = dot.dot(JSON.parse(file.content));
     Object.keys(flattenedObject).forEach((key, index) => {
-      accumulator[language].push({
+      var _accumulator$language;
+
+      (_accumulator$language = accumulator[language]) == null ? void 0 : _accumulator$language.push({
         line: index,
         path: key,
         file: file.fileName
@@ -169,7 +171,7 @@ function extractI18nItemsFromLanguageFiles(languageFiles) {
   }, {});
 }
 
-function writeMissingToLanguage(resolvedLanguageFiles, missingKeys) {
+function writeMissingToLanguage(resolvedLanguageFiles, missingKeys, dot = Dot) {
   const languageFiles = readLangFiles(resolvedLanguageFiles);
   languageFiles.forEach(languageFile => {
     const languageFileContent = JSON.parse(languageFile.content);
@@ -179,7 +181,7 @@ function writeMissingToLanguage(resolvedLanguageFiles, missingKeys) {
       }
     });
     const fileExtension = languageFile.fileName.substring(languageFile.fileName.lastIndexOf('.') + 1);
-    const filePath = path.resolve(process.cwd(), languageFile.fileName);
+    const filePath = languageFile.path;
     const stringifiedContent = JSON.stringify(languageFileContent, null, 2);
 
     if (fileExtension === 'json') {
@@ -193,9 +195,9 @@ function writeMissingToLanguage(resolvedLanguageFiles, missingKeys) {
     }
   });
 }
-function parseLanguageFiles(languageFilesPath) {
+function parseLanguageFiles(languageFilesPath, dot = Dot) {
   const filesList = readLangFiles(languageFilesPath);
-  return extractI18nItemsFromLanguageFiles(filesList);
+  return extractI18nItemsFromLanguageFiles(filesList, dot);
 }
 
 var VueI18NExtractReportTypes;
@@ -279,11 +281,11 @@ async function writeReportToFile(report, writePath) {
   });
 }
 
-function createI18NReport(vueFiles, languageFiles, command) {
+function createI18NReport(vueFiles, languageFiles, command, dot = Dot) {
   const resolvedVueFiles = path.resolve(process.cwd(), vueFiles);
   const resolvedLanguageFiles = path.resolve(process.cwd(), languageFiles);
   const parsedVueFiles = parseVueFiles(resolvedVueFiles);
-  const parsedLanguageFiles = parseLanguageFiles(resolvedLanguageFiles);
+  const parsedLanguageFiles = parseLanguageFiles(resolvedLanguageFiles, dot);
   const reportType = command.dynamic ? VueI18NExtractReportTypes.All : VueI18NExtractReportTypes.Missing + VueI18NExtractReportTypes.Unused;
   return extractI18NReport(parsedVueFiles, parsedLanguageFiles, reportType);
 }
@@ -295,7 +297,8 @@ async function reportCommand(command) {
     add,
     dynamic
   } = command;
-  const report = createI18NReport(vueFiles, languageFiles, command);
+  const dot = typeof command.separator === 'string' ? new Dot(command.separator) : Dot;
+  const report = createI18NReport(vueFiles, languageFiles, command, dot);
   if (report.missingKeys) console.info('missing keys: '), console.table(report.missingKeys);
   if (report.unusedKeys) console.info('unused keys: '), console.table(report.unusedKeys);
   if (report.dynamicKeys && dynamic && dynamic > 1) console.info('dynamic detected keys: '), console.table(report.dynamicKeys);
@@ -307,7 +310,7 @@ async function reportCommand(command) {
 
   if (add && report.missingKeys && report.missingKeys.length > 0) {
     const resolvedLanguageFiles = path.resolve(process.cwd(), languageFiles);
-    writeMissingToLanguage(resolvedLanguageFiles, report.missingKeys);
+    writeMissingToLanguage(resolvedLanguageFiles, report.missingKeys, dot);
     console.log('The missing keys have been added to your languages files');
   }
 }

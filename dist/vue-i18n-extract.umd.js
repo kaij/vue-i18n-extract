@@ -1,13 +1,13 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('path'), require('is-valid-glob'), require('glob'), require('fs'), require('dot-object'), require('js-yaml')) :
-  typeof define === 'function' && define.amd ? define(['exports', 'path', 'is-valid-glob', 'glob', 'fs', 'dot-object', 'js-yaml'], factory) :
-  (global = global || self, factory(global.vueI18NExtract = {}, global.path, global.isValidGlob, global.glob, global.fs, global.dotObject, global.jsYaml));
-}(this, (function (exports, path, isValidGlob, glob, fs, dot, yaml) {
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('path'), require('dot-object'), require('is-valid-glob'), require('glob'), require('fs'), require('js-yaml')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'path', 'dot-object', 'is-valid-glob', 'glob', 'fs', 'js-yaml'], factory) :
+  (global = global || self, factory(global.vueI18NExtract = {}, global.path, global.dotObject, global.isValidGlob, global.glob, global.fs, global.jsYaml));
+}(this, (function (exports, path, Dot, isValidGlob, glob, fs, yaml) {
   path = path && Object.prototype.hasOwnProperty.call(path, 'default') ? path['default'] : path;
+  Dot = Dot && Object.prototype.hasOwnProperty.call(Dot, 'default') ? Dot['default'] : Dot;
   isValidGlob = isValidGlob && Object.prototype.hasOwnProperty.call(isValidGlob, 'default') ? isValidGlob['default'] : isValidGlob;
   glob = glob && Object.prototype.hasOwnProperty.call(glob, 'default') ? glob['default'] : glob;
   fs = fs && Object.prototype.hasOwnProperty.call(fs, 'default') ? fs['default'] : fs;
-  dot = dot && Object.prototype.hasOwnProperty.call(dot, 'default') ? dot['default'] : dot;
   yaml = yaml && Object.prototype.hasOwnProperty.call(yaml, 'default') ? yaml['default'] : yaml;
 
   function _extends() {
@@ -154,7 +154,7 @@
     });
   }
 
-  function extractI18nItemsFromLanguageFiles(languageFiles) {
+  function extractI18nItemsFromLanguageFiles(languageFiles, dot = Dot) {
     return languageFiles.reduce((accumulator, file) => {
       const language = file.fileName.substring(file.fileName.lastIndexOf('/') + 1, file.fileName.lastIndexOf('.'));
 
@@ -164,7 +164,9 @@
 
       const flattenedObject = dot.dot(JSON.parse(file.content));
       Object.keys(flattenedObject).forEach((key, index) => {
-        accumulator[language].push({
+        var _accumulator$language;
+
+        (_accumulator$language = accumulator[language]) == null ? void 0 : _accumulator$language.push({
           line: index,
           path: key,
           file: file.fileName
@@ -174,7 +176,7 @@
     }, {});
   }
 
-  function writeMissingToLanguage(resolvedLanguageFiles, missingKeys) {
+  function writeMissingToLanguage(resolvedLanguageFiles, missingKeys, dot = Dot) {
     const languageFiles = readLangFiles(resolvedLanguageFiles);
     languageFiles.forEach(languageFile => {
       const languageFileContent = JSON.parse(languageFile.content);
@@ -184,7 +186,7 @@
         }
       });
       const fileExtension = languageFile.fileName.substring(languageFile.fileName.lastIndexOf('.') + 1);
-      const filePath = path.resolve(process.cwd(), languageFile.fileName);
+      const filePath = languageFile.path;
       const stringifiedContent = JSON.stringify(languageFileContent, null, 2);
 
       if (fileExtension === 'json') {
@@ -198,9 +200,9 @@
       }
     });
   }
-  function parseLanguageFiles(languageFilesPath) {
+  function parseLanguageFiles(languageFilesPath, dot = Dot) {
     const filesList = readLangFiles(languageFilesPath);
-    return extractI18nItemsFromLanguageFiles(filesList);
+    return extractI18nItemsFromLanguageFiles(filesList, dot);
   }
 
   (function (VueI18NExtractReportTypes) {
@@ -282,11 +284,11 @@
     });
   }
 
-  function createI18NReport(vueFiles, languageFiles, command) {
+  function createI18NReport(vueFiles, languageFiles, command, dot = Dot) {
     const resolvedVueFiles = path.resolve(process.cwd(), vueFiles);
     const resolvedLanguageFiles = path.resolve(process.cwd(), languageFiles);
     const parsedVueFiles = parseVueFiles(resolvedVueFiles);
-    const parsedLanguageFiles = parseLanguageFiles(resolvedLanguageFiles);
+    const parsedLanguageFiles = parseLanguageFiles(resolvedLanguageFiles, dot);
     const reportType = command.dynamic ? exports.VueI18NExtractReportTypes.All : exports.VueI18NExtractReportTypes.Missing + exports.VueI18NExtractReportTypes.Unused;
     return extractI18NReport(parsedVueFiles, parsedLanguageFiles, reportType);
   }
@@ -298,7 +300,8 @@
       add,
       dynamic
     } = command;
-    const report = createI18NReport(vueFiles, languageFiles, command);
+    const dot = typeof command.separator === 'string' ? new Dot(command.separator) : Dot;
+    const report = createI18NReport(vueFiles, languageFiles, command, dot);
     if (report.missingKeys) console.info('missing keys: '), console.table(report.missingKeys);
     if (report.unusedKeys) console.info('unused keys: '), console.table(report.unusedKeys);
     if (report.dynamicKeys && dynamic && dynamic > 1) console.info('dynamic detected keys: '), console.table(report.dynamicKeys);
@@ -310,7 +313,7 @@
 
     if (add && report.missingKeys && report.missingKeys.length > 0) {
       const resolvedLanguageFiles = path.resolve(process.cwd(), languageFiles);
-      writeMissingToLanguage(resolvedLanguageFiles, report.missingKeys);
+      writeMissingToLanguage(resolvedLanguageFiles, report.missingKeys, dot);
       console.log('The missing keys have been added to your languages files');
     }
   }
